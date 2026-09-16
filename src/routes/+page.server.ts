@@ -23,7 +23,7 @@ export const load: PageServerLoad = async () => {
             SELECT LONGITUDE, LATITUDE
             FROM wpp_arizona
             WHERE LONGITUDE IS NOT NULL AND LATITUDE IS NOT NULL
-            LIMIT 10000
+            GROUP BY 1, 2
         )
     `);
 
