@@ -1,57 +1,56 @@
 <script lang="ts">
-	let { data } = $props();
+	import { Map, GeoJSONSource, setWorkerUrl } from 'maplibre-gl';
+	import 'maplibre-gl/dist/maplibre-gl.css';
+	import type { Action } from 'svelte/action';
+	import type { FeatureCollection } from 'geojson';
+	import type { PageData } from './$types';
 
-	type Coord = [number, number];
-	type LineStringGeom = { type: 'LineString'; coordinates: Coord[] };
-	type MultiLineStringGeom = { type: 'MultiLineString'; coordinates: Coord[][] };
-	type Geom = LineStringGeom | MultiLineStringGeom | { type: string; coordinates: unknown };
+	import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 
-	const lines = $derived.by(() => {
-		const result: Coord[][] = [];
-		for (const row of data.lines) {
-			const geom = JSON.parse(row.geojson as string) as Geom;
-			if (geom.type === 'LineString') {
-				result.push((geom as LineStringGeom).coordinates);
-			} else if (geom.type === 'MultiLineString') {
-				result.push(...(geom as MultiLineStringGeom).coordinates);
+	setWorkerUrl(workerUrl);
+
+	let { data }: { data: PageData } = $props();
+
+	const mapAction: Action<HTMLDivElement, { geojson: FeatureCollection }> = (node, params) => {
+		const map = new Map({
+			container: node,
+			style: 'https://tiles.openfreemap.org/styles/liberty',
+			center: [-111.09, 34.04],
+			zoom: 6
+		});
+
+		map.on('load', () => {
+			map.addSource('points', {
+				type: 'geojson',
+				data: params.geojson
+			});
+
+			map.addLayer({
+				id: 'points-layer',
+				type: 'circle',
+				source: 'points',
+				paint: {
+					'circle-radius': 5,
+					'circle-color': '#ff3e00',
+					'circle-opacity': 0.8,
+					'circle-stroke-width': 1,
+					'circle-stroke-color': '#ffffff'
+				}
+			});
+		});
+
+		return {
+			update(newParams) {
+				if (map.isStyleLoaded()) {
+					const source = map.getSource('points') as GeoJSONSource;
+					if (source) source.setData(newParams.geojson);
+				}
+			},
+			destroy() {
+				map.remove();
 			}
-		}
-		return result;
-	});
-
-	const minX = $derived(Number(data.bounds.min_x));
-	const maxX = $derived(Number(data.bounds.max_x));
-	const minY = $derived(Number(data.bounds.min_y));
-	const maxY = $derived(Number(data.bounds.max_y));
-
-	const width = 800;
-	const height = 800;
-	const padding = 20;
-
-	function scaleX(lon: number) {
-		return padding + ((lon - minX) / (maxX - minX)) * (width - 2 * padding);
-	}
-	function scaleY(lat: number) {
-		return height - padding - ((lat - minY) / (maxY - minY)) * (height - 2 * padding);
-	}
-
-	function toPath(coords: Coord[]) {
-		return coords
-			.map(([lon, lat], i) => `${i === 0 ? 'M' : 'L'} ${scaleX(lon)} ${scaleY(lat)}`)
-			.join(' ');
-	}
+		};
+	};
 </script>
 
-<svg {width} {height} style="border: 1px solid #ccc;">
-	{#each lines as line}
-		<path d={toPath(line)} fill="none" stroke="#999" stroke-width="1" />
-	{/each}
-	{#each data.points as row}
-		<circle
-			cx={scaleX(Number(row.LONGITUDE))}
-			cy={scaleY(Number(row.LATITUDE))}
-			r={row.DECILE}
-			fill="rebeccapurple"
-		/>
-	{/each}
-</svg>
+<div use:mapAction={data} style="width: 100%; height: 100vh;"></div>
