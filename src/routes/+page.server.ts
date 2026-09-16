@@ -5,32 +5,45 @@ import type { FeatureCollection } from 'geojson';
 export const load: PageServerLoad = async () => {
 	const conn = await getConnection();
 
-	const reader = await conn.runAndReadAll(`
-        SELECT json_object(
-            'type', 'FeatureCollection',
-            'features', json_group_array(
-                json_object(
-                    'type', 'Feature',
-                    'geometry', json_object(
-                        'type', 'Point',
-                        'coordinates', [CAST(LONGITUDE AS DOUBLE), CAST(LATITUDE AS DOUBLE)]
-                    ),
-                    'properties', json_object()
+	let reader = await conn.runAndReadAll(`
+        SELECT
+            LIST(DISTINCT TOP_CATEGORY) FILTER (WHERE TOP_CATEGORY IS NOT NULL) as categories,
+            json_object(
+                'type', 'FeatureCollection',
+                'features', json_group_array(
+                    json_object(
+                        'type', 'Feature',
+                        'geometry', json_object(
+                            'type', 'Point',
+                            'coordinates', [CAST(LONGITUDE AS DOUBLE), CAST(LATITUDE AS DOUBLE)]
+                        ),
+                        'properties', json_object(
+                            'category', TOP_CATEGORY
+                        )
+                    )
                 )
-            )
-        ) as geojson
+            ) as geojson
         FROM (
-            SELECT LONGITUDE, LATITUDE
+            SELECT LONGITUDE, LATITUDE, TOP_CATEGORY
             FROM wpp_arizona
             WHERE LONGITUDE IS NOT NULL AND LATITUDE IS NOT NULL
-            GROUP BY 1, 2
+            GROUP BY 1, 2, 3
         )
     `);
 
-	const rows = reader.getRowObjects();
-	const rawJson = (rows[0]?.geojson as string) ?? '{"type":"FeatureCollection","features":[]}';
+	const row = reader.getRowObjects()[0];
+	const rawJson = (row?.geojson as string) ?? '{"type":"FeatureCollection","features":[]}';
+	const rawCategories = (row?.categories as string[]) ?? [];
+
+	reader = await conn.runAndReadAll(
+		'SELECT DISTINCT TOP_CATEGORY FROM wpp_arizona WHERE TOP_CATEGORY IS NOT NULL'
+	);
+	const categoryRows = reader.getRowObjects();
+	const categoryOptions = categoryRows.map((row) => row?.TOP_CATEGORY as string);
 
 	return {
-		geojson: JSON.parse(rawJson) as FeatureCollection
+		geojson: JSON.parse(rawJson) as FeatureCollection,
+		categories: Array.from(rawCategories).sort(),
+		categoryOptions
 	};
 };
