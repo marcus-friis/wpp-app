@@ -1,72 +1,65 @@
 <script lang="ts">
-	import { Map, GeoJSONSource, setWorkerUrl, type FilterSpecification } from 'maplibre-gl';
+	import { Map, setWorkerUrl } from 'maplibre-gl';
 	import 'maplibre-gl/dist/maplibre-gl.css';
 	import type { Action } from 'svelte/action';
 	import type { FeatureCollection } from 'geojson';
 	import type { PageData } from './$types';
+	import { goto } from '$app/navigation';
 
 	import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 
 	setWorkerUrl(workerUrl);
 
 	let { data }: { data: PageData } = $props();
-	let selectedCategory = $state('all');
 
-	type MapActionParams = { geojson: FeatureCollection; category: string };
-
-	const mapAction: Action<HTMLDivElement, MapActionParams> = (node, initialParams) => {
-		let currentParams = initialParams;
-
+	const mapAction: Action<HTMLDivElement, FeatureCollection> = (node, geojson) => {
 		const map = new Map({
 			container: node,
 			style: 'https://tiles.openfreemap.org/styles/liberty',
-			center: [-111.09, 34.04],
-			zoom: 6
+			center: [-98.5, 33],
+			zoom: 3.5
 		});
 
-		const updateFilter = () => {
-			if (!map.getLayer('points-layer')) return;
-
-			const filterExpression: FilterSpecification | null =
-				currentParams.category === 'all'
-					? null
-					: (['==', ['get', 'category'], currentParams.category] as FilterSpecification);
-
-			map.setFilter('points-layer', filterExpression);
-		};
-
 		map.on('load', () => {
-			map.addSource('points', {
+			map.addSource('states', {
 				type: 'geojson',
-				data: currentParams.geojson
+				data: geojson
 			});
 
 			map.addLayer({
-				id: 'points-layer',
-				type: 'circle',
-				source: 'points',
+				id: 'states-fill',
+				type: 'fill',
+				source: 'states',
 				paint: {
-					'circle-radius': 5,
-					'circle-color': '#ff3e00',
-					'circle-opacity': 0.8,
-					'circle-stroke-width': 1,
-					'circle-stroke-color': '#ffffff'
+					'fill-color': '#ff3e00',
+					'fill-opacity': 0.35
 				}
 			});
 
-			// Apply filter active at the time map finished loading
-			updateFilter();
+			map.addLayer({
+				id: 'states-outline',
+				type: 'line',
+				source: 'states',
+				paint: {
+					'line-color': '#ff3e00',
+					'line-width': 2
+				}
+			});
+
+			map.on('mouseenter', 'states-fill', () => {
+				map.getCanvas().style.cursor = 'pointer';
+			});
+			map.on('mouseleave', 'states-fill', () => {
+				map.getCanvas().style.cursor = '';
+			});
+
+			map.on('click', 'states-fill', (e) => {
+				const slug = e.features?.[0]?.properties?.slug as string | undefined;
+				if (slug) goto(`/${slug}`);
+			});
 		});
 
 		return {
-			update(newParams) {
-				currentParams = newParams;
-				if (map.getLayer('points-layer')) {
-					const source = map.getSource('points') as GeoJSONSource;
-					if (source) source.setData(currentParams.geojson);
-					updateFilter();
-				}
-			},
 			destroy() {
 				map.remove();
 			}
@@ -76,18 +69,11 @@
 
 <div class="container">
 	<div class="tooltip">
-		<label for="category-select">Filter Category:</label>
-		<select id="category-select" bind:value={selectedCategory}>
-			<option value="all">All Categories ({data.geojson.features.length})</option>
-			{#each data.categoryOptions as cat}
-				{#if cat}
-					<option value={cat}>{cat}</option>
-				{/if}
-			{/each}
-		</select>
+		<strong>States with data</strong>
+		<span>Click a state to explore its points of interest</span>
 	</div>
 
-	<div class="map" use:mapAction={{ geojson: data.geojson, category: selectedCategory }}></div>
+	<div class="map" use:mapAction={data.geojson}></div>
 </div>
 
 <style>
@@ -107,17 +93,10 @@
 		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 		z-index: 1;
 		display: flex;
-		align-items: center;
-		gap: 8px;
+		flex-direction: column;
+		gap: 4px;
 		font-family: system-ui, sans-serif;
 		font-size: 14px;
-	}
-
-	.tooltip select {
-		padding: 4px 8px;
-		border-radius: 4px;
-		border: 1px solid #ccc;
-		background: #fff;
 	}
 
 	.map {
