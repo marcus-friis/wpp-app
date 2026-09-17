@@ -54,9 +54,27 @@ export const load: PageServerLoad = async ({ params }) => {
 	const categoryRows = reader.getRowObjects();
 	const categoryOptions = categoryRows.map((row) => row?.TOP_CATEGORY as string);
 
+	reader = await conn.runAndReadAll(`
+        SELECT
+            ST_X(ST_Centroid(geom)) as centerLng,
+            ST_Y(ST_Centroid(geom)) as centerLat,
+            ST_XMin(geom) as minLng,
+            ST_YMin(geom) as minLat,
+            ST_XMax(geom) as maxLng,
+            ST_YMax(geom) as maxLat
+        FROM state_boundaries
+        WHERE fips = '${fips}'
+    `);
+	const boundsRow = reader.getRowObjects()[0];
+
 	return {
 		geojson: JSON.parse(rawJson) as FeatureCollection,
 		categories: Array.from(rawCategories).sort(),
-		categoryOptions
+		categoryOptions,
+		center: [boundsRow.centerLng as number, boundsRow.centerLat as number] as [number, number],
+		bounds: [
+			[boundsRow.minLng as number, boundsRow.minLat as number],
+			[boundsRow.maxLng as number, boundsRow.maxLat as number]
+		] as [[number, number], [number, number]]
 	};
 };

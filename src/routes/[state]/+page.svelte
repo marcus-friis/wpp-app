@@ -12,7 +12,12 @@
 	let { data }: { data: PageData } = $props();
 	let selectedCategory = $state('all');
 
-	type MapActionParams = { geojson: FeatureCollection; category: string };
+	type MapActionParams = {
+		geojson: FeatureCollection;
+		category: string;
+		center: [number, number];
+		bounds: [[number, number], [number, number]];
+	};
 
 	const mapAction: Action<HTMLDivElement, MapActionParams> = (node, initialParams) => {
 		let currentParams = initialParams;
@@ -20,9 +25,11 @@
 		const map = new Map({
 			container: node,
 			style: 'https://tiles.openfreemap.org/styles/liberty',
-			center: [-111.09, 34.04],
+			center: currentParams.center,
 			zoom: 6
 		});
+
+		map.fitBounds(currentParams.bounds, { padding: 40, duration: 0 });
 
 		const updateFilter = () => {
 			if (!map.getLayer('points-layer')) return;
@@ -54,7 +61,6 @@
 				}
 			});
 
-			// Apply filter active at the time map finished loading
 			updateFilter();
 		});
 
@@ -87,7 +93,15 @@
 		</select>
 	</div>
 
-	<div class="map" use:mapAction={{ geojson: data.geojson, category: selectedCategory }}></div>
+	<div
+		class="map"
+		use:mapAction={{
+			geojson: data.geojson,
+			category: selectedCategory,
+			center: data.center,
+			bounds: data.bounds
+		}}
+	></div>
 </div>
 
 <style>
