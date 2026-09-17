@@ -6,14 +6,12 @@ export const load: PageServerLoad = async () => {
 
 	let reader = await conn.runAndReadAll(
 		`SELECT LONGITUDE, LATITUDE, SUM(VISIT_COUNTS)::INT AS VISIT_COUNTS, NTILE(10) OVER (ORDER BY SUM(VISIT_COUNTS)) / 10 AS DECILE
-         FROM wpp_arizona
+         FROM wpp_04
          GROUP BY 1, 2`
 	);
 	const points = reader.getRowObjects();
 
-	reader = await conn.runAndReadAll(
-		'SELECT ST_AsGeoJSON(ST_Boundary(geom)) AS geojson FROM arizona_shp'
-	);
+	reader = await conn.runAndReadAll('SELECT ST_AsGeoJSON(ST_Boundary(geom)) AS geojson FROM bg_04');
 	const lines = reader.getRowObjects();
 
 	reader = await conn.runAndReadAll(`
@@ -23,11 +21,11 @@ export const load: PageServerLoad = async () => {
                 MAX(ST_XMax(geom)) AS max_x,
                 MIN(ST_YMin(geom)) AS min_y,
                 MAX(ST_YMax(geom)) AS max_y
-            FROM arizona_shp
+            FROM bg_04
         ),
         point_extent AS (
             SELECT MIN(LONGITUDE) AS min_x, MAX(LONGITUDE) AS max_x, MIN(LATITUDE) AS min_y, MAX(LATITUDE) AS max_y
-            FROM wpp_arizona
+            FROM wpp_04
         )
         SELECT
             LEAST(s.min_x, p.min_x) AS min_x,
