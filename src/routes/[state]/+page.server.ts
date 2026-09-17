@@ -8,6 +8,7 @@ export const load: PageServerLoad = async ({ params }) => {
 	const { state } = params;
 
 	const fibsMap: Record<string, string> = {
+		arizona: '04',
 		florida: '12'
 	};
 
@@ -37,7 +38,7 @@ export const load: PageServerLoad = async ({ params }) => {
             ) as geojson
         FROM (
             SELECT LONGITUDE, LATITUDE, TOP_CATEGORY
-            FROM wpp_${fips}
+            FROM pois_${fips}
             WHERE LONGITUDE IS NOT NULL AND LATITUDE IS NOT NULL
             GROUP BY 1, 2, 3
         )
@@ -48,7 +49,7 @@ export const load: PageServerLoad = async ({ params }) => {
 	const rawCategories = (row?.categories as string[]) ?? [];
 
 	reader = await conn.runAndReadAll(
-		`SELECT DISTINCT TOP_CATEGORY FROM wpp_${fips} WHERE TOP_CATEGORY IS NOT NULL`
+		`SELECT DISTINCT TOP_CATEGORY FROM pois_${fips} WHERE TOP_CATEGORY IS NOT NULL`
 	);
 	const categoryRows = reader.getRowObjects();
 	const categoryOptions = categoryRows.map((row) => row?.TOP_CATEGORY as string);
