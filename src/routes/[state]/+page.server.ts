@@ -4,7 +4,7 @@ import { getConnection } from '$lib/server/db';
 import type { FeatureCollection } from 'geojson';
 
 export const entries = () => {
-	return [{ state: 'arizona' }, { state: 'florida' }];
+	return [{ state: 'arizona' }, { state: 'florida' }, { state: 'texas' }];
 };
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -13,7 +13,8 @@ export const load: PageServerLoad = async ({ params }) => {
 
 	const fibsMap: Record<string, string> = {
 		arizona: '04',
-		florida: '12'
+		florida: '12',
+		texas: '48'
 	};
 
 	const fips = fibsMap[state.toLowerCase().trim()];
