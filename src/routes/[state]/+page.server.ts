@@ -3,6 +3,10 @@ import { error } from '@sveltejs/kit';
 import { getConnection } from '$lib/server/db';
 import type { FeatureCollection } from 'geojson';
 
+export const entries = () => {
+	return [{ state: 'arizona' }, { state: 'florida' }];
+};
+
 export const load: PageServerLoad = async ({ params }) => {
 	const conn = await getConnection();
 	const { state } = params;
