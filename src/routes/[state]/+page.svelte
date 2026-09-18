@@ -4,19 +4,25 @@
 	import type { Action } from 'svelte/action';
 	import type { FeatureCollection } from 'geojson';
 	import type { PageData } from './$types';
+	import NumberFlow from '@number-flow/svelte';
 
 	import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 
 	setWorkerUrl(workerUrl);
 
 	let { data }: { data: PageData } = $props();
+	let totalPoints = $derived(data.geojson.features.length);
+
 	let selectedCategory = $state('all');
+	let viewportPoints = $state(0);
+	const visiblePercentage = $derived(totalPoints > 0 ? viewportPoints / totalPoints : 0);
 
 	type MapActionParams = {
 		geojson: FeatureCollection;
 		category: string;
 		center: [number, number];
 		bounds: [[number, number], [number, number]];
+		onViewportCountChange?: (count: number) => void;
 	};
 
 	const mapAction: Action<HTMLDivElement, MapActionParams> = (node, initialParams) => {
@@ -29,7 +35,28 @@
 			zoom: 6
 		});
 
-		map.fitBounds(currentParams.bounds, { padding: 40, duration: 0 });
+		map.fitBounds(currentParams.bounds, {
+			padding: 40,
+			duration: 0
+		});
+
+		const updateViewportCount = () => {
+			if (!map.getLayer('points-layer')) return;
+
+			const features = map.queryRenderedFeatures(undefined, {
+				layers: ['points-layer']
+			});
+
+			currentParams.onViewportCountChange?.(features.length);
+		};
+
+		let countTimeout: ReturnType<typeof setTimeout>;
+		const scheduleViewportCount = () => {
+			clearTimeout(countTimeout);
+			countTimeout = setTimeout(() => {
+				updateViewportCount();
+			}, 100);
+		};
 
 		const updateFilter = () => {
 			if (!map.getLayer('points-layer')) return;
@@ -40,6 +67,8 @@
 					: (['==', ['get', 'category'], currentParams.category] as FilterSpecification);
 
 			map.setFilter('points-layer', filterExpression);
+
+			requestAnimationFrame(updateViewportCount);
 		};
 
 		map.on('load', () => {
@@ -53,7 +82,7 @@
 				type: 'circle',
 				source: 'points',
 				paint: {
-					'circle-radius': 5,
+					'circle-radius': 2,
 					'circle-color': '#ff3e00',
 					'circle-opacity': 0.8,
 					'circle-stroke-width': 1,
@@ -62,17 +91,28 @@
 			});
 
 			updateFilter();
+			updateViewportCount();
+
+			map.on('moveend', scheduleViewportCount);
+			map.on('zoomend', scheduleViewportCount);
 		});
 
 		return {
 			update(newParams) {
 				currentParams = newParams;
+
 				if (map.getLayer('points-layer')) {
 					const source = map.getSource('points') as GeoJSONSource;
-					if (source) source.setData(currentParams.geojson);
+
+					if (source) {
+						source.setData(currentParams.geojson);
+					}
+
 					updateFilter();
+					updateViewportCount();
 				}
 			},
+
 			destroy() {
 				map.remove();
 			}
@@ -81,17 +121,45 @@
 </script>
 
 <div class="container">
-	<div class="tooltip">
-		<label for="category-select">Filter Category:</label>
-		<select id="category-select" bind:value={selectedCategory}>
-			<option value="all">All Categories ({data.geojson.features.length})</option>
-			{#each data.categoryOptions as cat}
-				{#if cat}
-					<option value={cat}>{cat}</option>
-				{/if}
-			{/each}
-		</select>
-	</div>
+	<aside class="tooltip">
+		<div class="stats">
+			<div class="stat-row">
+				<span class="stat-label">Total points</span>
+				<span class="stat-value">{totalPoints.toLocaleString()}</span>
+			</div>
+			<div class="stat-row">
+				<span class="stat-label">In viewport</span>
+				<span class="stat-value">
+					<NumberFlow value={viewportPoints} willChange={true} />
+				</span>
+			</div>
+			<div class="stat-row stat-row--percent">
+				<NumberFlow
+					value={visiblePercentage}
+					format={{
+						style: 'percent',
+						maximumFractionDigits: 1
+					}}
+					locales="en-DK"
+					willChange={true}
+				/>
+				<span class="stat-label">of total visible</span>
+			</div>
+		</div>
+
+		<div class="filter">
+			<label for="category-select">Category</label>
+			<select id="category-select" bind:value={selectedCategory}>
+				<option value="all">All ({data.geojson.features.length})</option>
+
+				{#each data.categoryOptions as cat}
+					{#if cat}
+						<option value={cat}>{cat}</option>
+					{/if}
+				{/each}
+			</select>
+		</div>
+	</aside>
 
 	<div
 		class="map"
@@ -99,7 +167,10 @@
 			geojson: data.geojson,
 			category: selectedCategory,
 			center: data.center,
-			bounds: data.bounds
+			bounds: data.bounds,
+			onViewportCountChange: (count) => {
+				viewportPoints = count;
+			}
 		}}
 	></div>
 </div>
@@ -115,23 +186,77 @@
 		position: absolute;
 		top: 16px;
 		left: 16px;
-		background-color: #fbfaf7;
-		padding: 10px 14px;
-		border-radius: 6px;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 		z-index: 1;
-		display: flex;
-		align-items: center;
-		gap: 8px;
+		width: 220px;
+		background-color: #fbfaf7;
+		border-radius: 10px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 		font-family: system-ui, sans-serif;
-		font-size: 14px;
+		overflow: hidden;
 	}
 
-	.tooltip select {
-		padding: 4px 8px;
-		border-radius: 4px;
-		border: 1px solid #ccc;
+	.stats {
+		display: flex;
+		flex-direction: column;
+		padding: 14px 16px;
+		gap: 6px;
+	}
+
+	.stat-row {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		font-size: 13px;
+	}
+
+	.stat-label {
+		color: #8a8a85;
+	}
+
+	.stat-value {
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+		color: #1a1a1a;
+	}
+
+	.stat-row--percent {
+		margin-top: 4px;
+		justify-content: flex-start;
+		gap: 6px;
+		font-size: 20px;
+		font-weight: 700;
+		color: #ff3e00;
+	}
+
+	.stat-row--percent .stat-label {
+		font-size: 12px;
+		font-weight: 400;
+		color: #8a8a85;
+	}
+
+	.filter {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		padding: 12px 16px;
+		background-color: #f2f1ec;
+		border-top: 1px solid #e5e5e0;
+	}
+
+	.filter label {
+		font-size: 11px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		color: #8a8a85;
+	}
+
+	.filter select {
+		padding: 6px 8px;
+		border-radius: 5px;
+		border: 1px solid #d5d4cf;
 		background: #fff;
+		font-size: 13px;
 	}
 
 	.map {
