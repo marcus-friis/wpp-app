@@ -122,6 +122,23 @@
 
 <div class="container">
 	<aside class="tooltip">
+		<nav>
+			<a href="/" class="back-link">
+				<svg
+					width="14"
+					height="14"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2.5"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path d="M19 12H5M12 19l-7-7 7-7" />
+				</svg>
+				Back
+			</a>
+		</nav>
 		<div class="stats">
 			<div class="stat-row">
 				<span class="stat-label">Total points</span>
@@ -193,6 +210,36 @@
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 		font-family: system-ui, sans-serif;
 		overflow: hidden;
+	}
+
+	.tooltip nav {
+		padding: 10px 16px;
+		border-bottom: 1px solid #e5e5e0;
+	}
+
+	.back-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 12px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		color: #8a8a85;
+		text-decoration: none;
+		transition: color 0.15s ease;
+	}
+
+	.back-link:hover {
+		color: #ff3e00;
+	}
+
+	.back-link svg {
+		transition: transform 0.15s ease;
+	}
+
+	.back-link:hover svg {
+		transform: translateX(-2px);
 	}
 
 	.stats {

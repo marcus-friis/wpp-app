@@ -1,6 +1,6 @@
 import { DuckDBInstance, type DuckDBConnection } from '@duckdb/node-api';
 
-const dbPath = '/Users/marfri/Desktop/weekly-patterns-plus-exploration/data/db.duckdb';
+const dbPath = '/Users/marfri/Desktop/weekly-patterns-plus-exploration/rofl.duckdb';
 
 let connection: DuckDBConnection | undefined;
 

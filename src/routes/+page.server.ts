@@ -15,14 +15,15 @@ export const load: PageServerLoad = async () => {
                         'geometry', json(ST_AsGeoJSON(geom)),
                         'properties', json_object(
                             'name', name,
-                            'slug', lower(name),
-                            'fips', fips
+                            'slug', lower(SLUG),
+                            'fips', STATEFP
                         )
                     )
                 )
             ) as geojson
         FROM (
-            SELECT * FROM state_boundaries ORDER BY name
+            SELECT STATEFP, STATE AS NAME, ABBR AS SLUG, GEOM
+            FROM states
         )
     `);
 
